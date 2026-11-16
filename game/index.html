@@ -1,0 +1,122 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>DUSTLINE — Ember District</title>
+<style>
+:root{--canvas:#14161a;--surface:#1e2228;--hairline:#2c323a;--ink:#e9e6df;--muted:#98a0a8;--accent:#f0a830;--slate:#5b7fa6;--r:4px;--ui:system-ui,-apple-system,'Segoe UI',sans-serif;--mono:ui-monospace,'SF Mono',Menlo,monospace}
+*{box-sizing:border-box}
+html,body{margin:0;height:100%;overflow:hidden;background:var(--canvas);color:var(--ink);font-family:var(--ui)}
+#game,#game canvas{position:fixed;inset:0;display:block}
+#hud{position:fixed;inset:0;pointer-events:none}
+#crosshair{position:fixed;left:50%;top:50%;width:22px;height:22px;transform:translate(-50%,-50%);--gap:2px}
+#crosshair i{position:absolute;background:var(--ink)}
+#crosshair i:nth-child(1){left:10px;top:calc(11px - var(--gap) - 7px);width:2px;height:7px}
+#crosshair i:nth-child(2){left:10px;top:calc(11px + var(--gap));width:2px;height:7px}
+#crosshair i:nth-child(3){top:10px;left:calc(11px - var(--gap) - 7px);height:2px;width:7px}
+#crosshair i:nth-child(4){top:10px;left:calc(11px + var(--gap));height:2px;width:7px}
+#hitmarker{position:fixed;left:50%;top:50%;width:26px;height:26px;transform:translate(-50%,-50%) rotate(45deg);opacity:0}
+#hitmarker.on{opacity:1}
+#hitmarker i{position:absolute;background:var(--accent)}
+#hitmarker i:nth-child(1){left:12px;top:0;width:2px;height:8px}
+#hitmarker i:nth-child(2){left:12px;bottom:0;width:2px;height:8px}
+#hitmarker i:nth-child(3){top:12px;left:0;height:2px;width:8px}
+#hitmarker i:nth-child(4){top:12px;right:0;height:2px;width:8px}
+#ammo{position:fixed;right:32px;bottom:24px;display:flex;align-items:baseline;gap:8px;font-family:var(--mono);font-size:56px;line-height:1}
+#ammo.empty #ammo-mag{color:var(--accent)}
+#ammo-reserve{font-size:16px;color:var(--muted)}
+#health{position:fixed;left:32px;bottom:24px;font-family:var(--mono)}
+#health-value{font-size:40px}
+#health.low #health-value{color:var(--accent)}
+#armor-value{display:block;font-size:14px;color:var(--slate)}
+#money{position:fixed;left:32px;bottom:96px;font-family:var(--mono)}
+#money-value{color:var(--accent)}
+#scoreboard{position:fixed;left:50%;top:18px;transform:translateX(-50%);display:flex;align-items:baseline;gap:12px;font-family:var(--mono);font-size:20px}
+#score-ember{color:var(--accent)}#score-slate{color:var(--slate)}
+#round-label{font-size:12px;color:var(--muted)}
+#timer{position:fixed;left:50%;top:52px;transform:translateX(-50%);font-family:var(--mono);font-size:15px;color:var(--muted)}
+#spike-status{position:fixed;left:50%;top:80px;transform:translateX(-50%);font-size:13px;color:var(--accent)}
+#killfeed{position:fixed;right:24px;top:20px;margin:0;padding:0;list-style:none;text-align:right;font-size:13px}
+#killfeed li{margin-bottom:4px;padding:3px 8px;background:rgba(30,34,40,.8);border-radius:var(--r);color:var(--muted)}
+#banner{position:fixed;left:50%;top:32%;transform:translate(-50%,-50%);text-align:center;opacity:0}
+#banner.on{opacity:1}
+#banner-text{font-size:44px;font-weight:600;text-transform:uppercase}
+#banner-sub{font-size:15px;color:var(--muted)}
+#progress{position:fixed;left:50%;bottom:120px;transform:translateX(-50%);width:260px;text-align:center}
+#progress-label{margin-bottom:6px;font-size:13px;text-transform:uppercase}
+#progress-track{height:6px;background:var(--hairline);overflow:hidden}
+#progress-fill{height:100%;width:0;background:var(--accent)}
+#vignette{position:fixed;inset:0;pointer-events:none;opacity:0;box-shadow:inset 0 0 120px 40px rgba(200,30,30,.55)}
+#scope{position:fixed;inset:0;pointer-events:none;background:radial-gradient(circle at 50% 50%,transparent 34%,rgba(0,0,0,.96) 35%)}
+#buymenu{position:fixed;left:50%;top:50%;transform:translate(-50%,-50%);width:min(380px,92vw);padding:20px 24px;background:var(--surface);border:1px solid var(--hairline);border-radius:var(--r);pointer-events:auto}
+#buymenu h2{margin:0 0 4px;font-size:20px;font-weight:500}
+#buy-money{margin-bottom:12px;font-family:var(--mono);color:var(--accent)}
+#buy-list{margin:0;padding:0;list-style:none}
+#buy-list li{display:flex;justify-content:space-between;gap:12px;padding:9px 10px;border:1px solid var(--hairline);border-radius:var(--r);margin-bottom:6px;cursor:pointer;font-size:14px}
+#buy-list li.owned{border-color:var(--accent);color:var(--accent)}
+#buy-list li.cant{opacity:.45;cursor:default}
+#buy-list .price{font-family:var(--mono);color:var(--muted)}
+#buy-list li small{display:block;color:var(--muted);font-size:12px}
+.overlay{position:fixed;inset:0;display:grid;place-items:center;padding:24px;background:rgba(20,22,26,.86)}
+.overlay[hidden]{display:none}
+.panel{width:min(420px,100%);padding:32px;background:var(--surface);border:1px solid var(--hairline);border-radius:var(--r)}
+.panel h1{margin:0 0 8px;font-size:32px;line-height:1.15;font-weight:500}
+.panel p{margin:0 0 24px;font-size:16px;line-height:1.5;color:var(--muted)}
+#play{font:inherit;font-weight:500;padding:12px 16px;border:1px solid var(--accent);border-radius:8px;background:var(--accent);color:var(--canvas);cursor:pointer}
+.keys{margin:24px 0 0;padding:0;list-style:none;display:grid;gap:8px;font-size:14px;color:var(--muted)}
+.keys li{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.keys kbd{padding:2px 6px;border:1px solid var(--hairline);border-radius:var(--r);font-family:var(--mono);font-size:12px;color:var(--ink)}
+</style>
+</head>
+<body>
+<div id="game"></div>
+<div id="hud">
+<div id="crosshair"><i></i><i></i><i></i><i></i></div>
+<div id="hitmarker"><i></i><i></i><i></i><i></i></div>
+<div id="ammo"><span id="ammo-mag">30</span><span id="ammo-reserve">/ 90</span></div>
+<div id="health"><span id="health-value">100</span><span id="armor-value">Armor 0</span></div>
+<div id="money"><span id="money-value">$800</span></div>
+<div id="scoreboard"><span id="score-ember">EMBER 0</span><span id="round-label">ROUND 1</span><span id="score-slate">0 SLATE</span></div>
+<div id="timer"><span id="timer-value">1:40</span></div>
+<div id="spike-status"><span id="spike-text"></span></div>
+<ul id="killfeed"></ul>
+<div id="banner"><div id="banner-text"></div><div id="banner-sub"></div></div>
+<div id="progress" hidden><div id="progress-label"></div><div id="progress-track"><div id="progress-fill"></div></div></div>
+<div id="vignette"></div>
+<div id="scope" hidden></div>
+<div id="buymenu" hidden>
+<h2>BUY — Ember District</h2>
+<div id="buy-money">$800</div>
+<ul id="buy-list">
+<li data-weapon="sidearm"><span>P9 Sidearm<small>25 dmg · 12 mag</small></span><span class="price">$0</span></li>
+<li data-weapon="smg"><span>VK-9 Rasp<small>22 dmg · 30 mag</small></span><span class="price">$900</span></li>
+<li data-weapon="rifle"><span>AR-77 Duster<small>34 dmg · 30 mag</small></span><span class="price">$1800</span></li>
+<li data-weapon="shotgun"><span>SG-12 Breacher<small>8×12 dmg · 6 mag</small></span><span class="price">$1200</span></li>
+<li data-weapon="sniper"><span>LW-50 Longshot<small>90 dmg · scope · 5 mag</small></span><span class="price">$2500</span></li>
+<li data-weapon="armor"><span>Plating Armor<small>absorbs 50% · 100 HP</small></span><span class="price">$500</span></li>
+</ul>
+</div>
+</div>
+<div id="overlay" class="overlay">
+<section class="panel">
+<h1 id="overlay-title">DUSTLINE</h1>
+<p id="overlay-copy">3v3 taktis di Ember District. Plant spike, first to 5.</p>
+<button id="play" type="button">Click to play</button>
+<ul class="keys">
+<li><kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> Move</li>
+<li><kbd>Mouse</kbd> Look</li>
+<li><kbd>Click</kbd> Fire</li>
+<li><kbd>R</kbd> Reload</li>
+<li><kbd>Ctrl</kbd>/<kbd>C</kbd> Crouch</li>
+<li><kbd>Space</kbd> Jump</li>
+<li><kbd>B</kbd> Buy</li>
+<li><kbd>E</kbd> Plant/defuse (hold)</li>
+<li><kbd>M</kbd> Mute</li>
+<li><kbd>R-Click</kbd> Scope (sniper)</li>
+</ul>
+</section>
+</div>
+<script type="importmap">{"imports":{"three":"./vendor/three/three.module.min.js"}}</script>
+<script type="module" src="./src/main.js"></script>
+</body>
+</html>
